@@ -1,14 +1,34 @@
 {
   "name": "dhara",
   "version": "0.1.0",
-  "description": "CLI tool for seamless file transfer between desktop and mobile devices",
+  "description": "A minimal, fast file transfer CLI tool between desktop and mobile using QR codes and a simple web UI.",
   "main": "./dist/cli.js",
   "type": "module",
   "scripts": {
     "start": "bun run bin/cli.ts",
-    "build": "bun build ./bin/cli.ts --compile --outfile=dist/dhara"
+    "build": "bun build ./bin/cli.ts --compile --outfile=dist/dhara",
+    "dev": "bun --watch ./bin/cli.ts",
+    "test": "bun test"
   },
   "bin": {"dhara": "./bin/cli.ts"},
+    "keywords": [
+    "cli",
+    "bun",
+    "file-sharing",
+    "qr-code",
+    "terminal",
+    "desktop-to-mobile",
+    "mobile-to-desktop"
+  ],
+  "author": "DeadpoolX7",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DeadpoolX7/dhara"
+  },
+  "bugs": {
+    "url": "https://github.com/DeadpoolX7/dhara/issues"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^24.2.1"
@@ -21,5 +41,11 @@
     "cli-progress": "^3.12.0",
     "commander": "^14.0.0",
     "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
