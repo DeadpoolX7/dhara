@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Send files to desktop</title>
+<style>
+  body { font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px; }
+  h2 { text-align: center; }
+  #progress-container { display: none; margin-top: 20px; }
+  #progress { width: 100%; }
+</style>
+</head>
+<body>
+<h2>Send Files to Desktop</h2>
+<form id="uploadForm">
+  <input type="file" id="files" name="files" multiple required>
+  <button type="submit">Send</button>
+</form>
+
+<div id="progress-container">
+  <p>Uploading...</p>
+  <progress id="progress" value="0" max="100"></progress>
+</div>
+
+<script>
+const form = document.getElementById('uploadForm');
+const progressContainer = document.getElementById('progress-container');
+const progressBar = document.getElementById('progress');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const files = document.getElementById('files').files;
+  if (!files.length) return alert('Select files first.');
+
+  const formData = new FormData();
+  for (let file of files) {
+    formData.append('files', file);
+  }
+
+  progressContainer.style.display = 'block';
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', window.location.pathname, true);
+
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable) {
+      const percent = (event.loaded / event.total) * 100;
+      progressBar.value = percent;
+    }
+  };
+
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      alert('✅ Files sent successfully!');
+      progressBar.value = 100;
+    } else {
+      alert('❌ Upload failed.');
+    }
+  };
+
+  xhr.send(formData);
+});
+</script>
+</body>
+</html>
