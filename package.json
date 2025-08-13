@@ -1,6 +1,6 @@
 {
   "name": "dhara",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "A minimal, fast file transfer CLI tool between desktop and mobile using QR codes and a simple web UI.",
   "main": "./dist/cli.js",
   "type": "module",
