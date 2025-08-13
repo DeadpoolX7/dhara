@@ -1,5 +1,6 @@
 import { createReadStream, statSync, mkdirSync, writeFileSync } from "fs";
 import { networkInterfaces } from "os";
+import readline from "readline";
 import QRCode from "qrcode-terminal";
 import { SingleBar, Presets } from "cli-progress";
 import crypto from "crypto";
@@ -21,51 +22,68 @@ export async function startServer(filePath: string) {
 
   const progressBar = new SingleBar({}, Presets.shades_classic);
 
-  const server = Bun.serve({
-    port,
-    fetch(req) {
-      const { pathname } = new URL(req.url);
-      if (pathname === `/download/${token}`) {
-        if (downloadStarted) {
-          return new Response("This link has expired.", { status: 403 });
-        }
-        downloadStarted = true;
+  
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-        progressBar.start(fileSize, 0);
-
-        const fileStream = createReadStream(filePath);
-        let bytesSent = 0;
-
-        const progressStream = new ReadableStream({
-          start(controller) {
-            fileStream.on("data", (chunk) => {
-              bytesSent += chunk.length;
-              progressBar.update(bytesSent);
-              controller.enqueue(chunk);
-            });
-            fileStream.on("end", () => {
-              progressBar.stop();
-              controller.close();
-              setTimeout(() => {
-                console.log("\n✅ Transfer complete. Shutting down server...");
-                server.stop();
-              }, 1000);
-            });
-            fileStream.on("error", (err) => controller.error(err));
-          }
-        });
-
-        return new Response(progressStream, {
-          headers: {
-            "Content-Disposition": `attachment; filename="${fileName}"`,
-            "Content-Type": "application/octet-stream",
-            "Content-Length": fileSize.toString(),
-          },
-        });
-      }
-      return new Response("File not found", { status: 404 });
+// Display shutdown instructions after server starts
+function promptForShutdown() {
+  console.log("\nℹ️  Press Ctrl+C or type 'exit' to shut down the server.");
+  rl.on("line", (input) => {
+    if (input.trim().toLowerCase() === "exit") {
+      console.log("🛑 Shutting down server...");
+      server.stop();
+      rl.close();
     }
   });
+}
+
+ const server = Bun.serve({
+  port,
+  fetch(req) {
+    const { pathname } = new URL(req.url);
+    if (pathname === `/download/${token}`) {
+      if (downloadStarted) {
+        return new Response("This link has expired.", { status: 403 });
+      }
+      downloadStarted = true;
+
+      progressBar.start(fileSize, 0);
+
+      const fileStream = createReadStream(filePath);
+      let bytesSent = 0;
+
+      const progressStream = new ReadableStream({
+        start(controller) {
+          fileStream.on("data", (chunk) => {
+            bytesSent += chunk.length;
+            progressBar.update(bytesSent);
+            controller.enqueue(chunk);
+          });
+          fileStream.on("end", () => {
+            progressBar.stop();
+            controller.close();
+            console.log("\n✅ Transfer complete.");
+            console.log("ℹ️  Type 'exit' or press Ctrl+C to stop the server.");
+          });
+          fileStream.on("error", (err) => controller.error(err));
+        }
+      });
+
+      return new Response(progressStream, {
+        headers: {
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Type": "application/octet-stream",
+          "Content-Length": fileSize.toString(),
+        },
+      });
+    }
+    return new Response("File not found", { status: 404 });
+  }
+});
+promptForShutdown();
 }
 
 function getLocalIP(): string {
@@ -85,12 +103,16 @@ export async function startReceiver(sessionId: string) {
   const ip = getLocalIP();
   const port = 3000;
   const uploadDir = path.join(process.cwd(), `dhara_uploads_${Date.now()}`);
-  mkdirSync(uploadDir);
+  mkdirSync(uploadDir, { recursive: true });
 
   const uploadUrl = `http://${ip}:${port}/upload/${sessionId}`;
   QRCode.generate(uploadUrl, { small: true });
   console.log(`📥 Receiving files at: ${uploadUrl}`);
   console.log(`📂 Saving to: ${uploadDir}`);
+  console.log(`\nℹ️  Press Ctrl+C or type 'exit' to shut down the server.`);
+
+  // manual shutdown via "exit" or Ctrl+C
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
   const server = Bun.serve({
     port,
@@ -98,26 +120,51 @@ export async function startReceiver(sessionId: string) {
       const { pathname } = new URL(req.url);
 
       if (pathname === `/upload/${sessionId}` && req.method === "GET") {
-        return new Response(await Bun.file(path.join(__dirname, "../public/upload.html")).text(), {
+        const htmlPath = path.join(__dirname, "../public/upload.html");
+        return new Response(await Bun.file(htmlPath).text(), {
           headers: { "Content-Type": "text/html" }
         });
       }
 
       if (pathname === `/upload/${sessionId}` && req.method === "POST") {
-        const formData = await req.formData();
-        for (const [_, file] of formData) {
-          if (file instanceof File) {
-            const savePath = path.join(uploadDir, file.name);
-            await Bun.write(savePath, file);
-            console.log(`✅ Received: ${file.name} (${file.size} bytes)`);
+        try {
+          const formData = await req.formData();
+          let count = 0;
+
+          for (const [, file] of formData) {
+            if (file instanceof File) {
+              const savePath = path.join(uploadDir, file.name);
+              await Bun.write(savePath, file); // streams to disk in Bun
+              count++;
+              console.log(`✅ Received: ${file.name} (${file.size} bytes)`);
+            }
           }
+
+          console.log(`🎯 ${count} file(s) received. Keep this window open to receive more.`);
+          console.log(`ℹ️  Type 'exit' or press Ctrl+C to stop the server.`);
+          return new Response("OK");
+        } catch (e) {
+          console.error("❌ Upload error:", e);
+          return new Response("Upload failed", { status: 500 });
         }
-        console.log("🎯 All files received. Shutting down...");
-        setTimeout(() => server.stop(), 1000);
-        return new Response("OK");
       }
 
       return new Response("Not Found", { status: 404 });
     }
+  });
+
+  rl.on("line", (input) => {
+    if (input.trim().toLowerCase() === "exit") {
+      console.log("🛑 Shutting down server...");
+      server.stop();
+      rl.close();
+    }
+  });
+
+  process.on("SIGINT", () => {
+    console.log("\n🛑 Shutting down server (Ctrl+C)...");
+    try { server.stop(); } catch {}
+    rl.close();
+    process.exit(0);
   });
 }
