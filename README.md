@@ -13,8 +13,10 @@ Dhara is a CLI tool for seamless file transfer between devices using QR codes. S
 
 ## Installation
 
+__NOTE: use bun for installation and use.__
+
 ```bash
-npm install -g dhara
+bun install -g dhara
 ```
 
 ## Usage
@@ -69,22 +71,22 @@ Clone and install dependencies:
 ```bash
 git clone https://github.com/yourusername/dhara.git
 cd dhara
-npm install
+bun install
 ```
 
 Build the project:
 ```bash
-npm run build
+bun build
 ```
 
 Run locally:
 ```bash
-npm start
+bun run dev
 ```
 
 ## Requirements
 
-- Node.js >= 16.0.0
+- bun <= 1.2.21
 - Network connectivity between devices
 - Devices must be on the same local network
 
